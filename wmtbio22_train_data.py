@@ -1,134 +1,166 @@
-
 import os
+import shutil
 import sys
+from pathlib import Path
 
 from langdetect import detect
 
 from Bio import Entrez
+
 Entrez.email = "EMAIL"
+
 
 # pubmed
 
 def get_set_articles(records):
-	return records["PubmedArticle"]
+    return records["PubmedArticle"]
+
 
 def get_pmid(record):
-	return record["MedlineCitation"]["PMID"]
+    return record["MedlineCitation"]["PMID"]
+
 
 def get_abstract_text(record):
-	all_abstracttexts = []
-	try:
-		texts = []
-		texts.append(record["MedlineCitation"]["Article"]['Abstract']['AbstractText'])
-		if 'OtherAbstract' in record["MedlineCitation"]:
-			for item in record["MedlineCitation"]['OtherAbstract']:
-				texts.append(item['AbstractText'])
-		abstracttext = ""
-		for text in texts:
-			if len(text)>1:
-				abstracttext = ""
-				for part in text:
-					if len(part.attributes)>0:
-						label = part.attributes['Label']
-					else:
-						label = 'None'
-					part = part.replace('"', "'")
-					abstracttext += part+" "
-			else:
-				abstracttext = text[0]
-				abstracttext = abstracttext.replace('"',"'")
-			all_abstracttexts.append(abstracttext.strip())
-	except:
-		print('PMID '+get_pmid(record)+' - abstract not found!')
-	return all_abstracttexts
+    all_abstracttexts = []
+    try:
+        texts = []
+        texts.append(record["MedlineCitation"]["Article"]['Abstract']['AbstractText'])
+        if 'OtherAbstract' in record["MedlineCitation"]:
+            for item in record["MedlineCitation"]['OtherAbstract']:
+                texts.append(item['AbstractText'])
+        abstracttext = ""
+        for text in texts:
+            if len(text) > 1:
+                abstracttext = ""
+                for part in text:
+                    if len(part.attributes) > 0:
+                        label = part.attributes['Label']
+                    else:
+                        label = 'None'
+                    part = part.replace('"', "'")
+                    abstracttext += part + " "
+            else:
+                abstracttext = text[0]
+                abstracttext = abstracttext.replace('"', "'")
+            all_abstracttexts.append(abstracttext.strip())
+    except:
+        print('PMID ' + get_pmid(record) + ' - abstract not found!')
+    return all_abstracttexts
+
 
 def build_article(record):
-	articles = []	
-	langs = []
-	all_abstracttexts = get_abstract_text(record)
-	for index in range(0,len(all_abstracttexts)):
-		article = {}
-		article["pmid"] = get_pmid(record)
-		article["abstracttext"] = all_abstracttexts[index]
-		# lang
-		lang = detect(article["abstracttext"]) 
-		article["lang"] = lang
-		langs.append(lang)
-		articles.append(article)
-	return articles, langs
+    articles = []
+    langs = []
+    all_abstracttexts = get_abstract_text(record)
+    for index in range(0, len(all_abstracttexts)):
+        article = {}
+        article["pmid"] = get_pmid(record)
+        article["abstracttext"] = all_abstracttexts[index]
+        # lang
+        lang = detect(article["abstracttext"])
+        article["lang"] = lang
+        langs.append(lang)
+        articles.append(article)
+    return articles, langs
+
 
 # fetch
 
 def fetch_pubmed_articles(ids):
-	ids = ",".join(ids)
-	handle = Entrez.efetch(db="pubmed", id=ids, retmode="xml")
-	records = Entrez.read(handle)
-	#print(records)
-	set_articles = []
-	set_langs = []
-	for record in get_set_articles(records):
-		#print(record)
-		article, langs = build_article(record)
-		set_articles.append(article)
-		set_langs.append(langs)
-	handle.close()
-	#print(len(articles))
-	return set_articles, set_langs
+    ids = ",".join(ids)
+    handle = Entrez.efetch(db="pubmed", id=ids, retmode="xml")
+    records = Entrez.read(handle)
+    # print(records)
+    set_articles = []
+    set_langs = []
+    for record in get_set_articles(records):
+        # print(record)
+        article, langs = build_article(record)
+        set_articles.append(article)
+        set_langs.append(langs)
+    handle.close()
+    # print(len(articles))
+    return set_articles, set_langs
+
 
 def fetch_multiple_articles(pmids, out_dir, lang1, lang2):
-	print(pmids)
-	set_articles, set_langs = fetch_pubmed_articles(pmids)
-	for index in range(0,len(set_articles)):
-		langs = set_langs[index]
-		#print(langs)
-		if len(langs)<2 or lang1 not in langs or lang2 not in langs:
-			continue
-		article = set_articles[index]
-		for item in article:
-			lang = detect(item["abstracttext"])
-			if lang!=lang1 and lang!=lang2:
-				continue
-			print(item["pmid"])
-			print(item["abstracttext"])
-			print(item["lang"])
-			with open(os.path.join(out_dir,item["pmid"]+"_"+item["lang"]+".txt"), "w") as writer:
-				writer.write(item["abstracttext"]+"\n")
-			writer.close()
+    print(pmids)
+    set_articles, set_langs = fetch_pubmed_articles(pmids)
+    for index in range(0, len(set_articles)):
+        langs = set_langs[index]
+        # print(langs)
+        if len(langs) < 2 or lang1 not in langs or lang2 not in langs:
+            continue
+        article = set_articles[index]
+        for item in article:
+            lang = detect(item["abstracttext"])
+            if lang != lang1 and lang != lang2:
+                continue
+            print(item["pmid"])
+            print(item["abstracttext"])
+            print(item["lang"])
+            with open(os.path.join(out_dir, item["pmid"] + "_" + item["lang"] + ".txt"), "w") as writer:
+                writer.write(item["abstracttext"] + "\n")
+            writer.close()
+
 
 map_langs = {
-	"eng": "en",
-	"ita": "it",
-	"chi": "zh-cn",
-	"fre": "fr",
-	"ger": "de",
-	"por": "pt",
-	"spa": "es",
-	"rus": "ru" 
+    "eng": "en",
+    "ita": "it",
+    "chi": "zh-cn",
+    "fre": "fr",
+    "ger": "de",
+    "por": "pt",
+    "spa": "es",
+    "rus": "ru"
 }
 
+
 def get_lang1_lang2(filename):
-	lang1, lang2 = filename[0:7].split("_")
-	lang1 = map_langs[lang1]
-	lang2 = map_langs[lang2]
-	return lang1, lang2
+    lang1, lang2 = filename[0:7].split("_")
+    lang1 = map_langs[lang1]
+    lang2 = map_langs[lang2]
+    return lang1, lang2
+
 
 def retrieve_abstracts(filename, out_dir):
-	lang1, lang2 = get_lang1_lang2(filename)
-	pmids = []	
-	with open(os.path.join(filename), "r") as reader:
-		lines = reader.readlines()
-		for line in lines:
-			pmid = line.strip()
-			pmids.append(pmid)
-			if len(pmids)<100:
-				continue
-			# fetch
-			fetch_multiple_articles(pmids,out_dir,lang1,lang2)
-			pmids = []
-	if len(pmids)>0:
-		fetch_multiple_articles(pmids, out_dir, lang1, lang2)
+    lang1, lang2 = get_lang1_lang2(filename)
+    pmids = []
+    with open(os.path.join(filename), "r") as reader:
+        lines = reader.readlines()
+        for line in lines:
+            pmid = line.strip()
+            pmids.append(pmid)
+            if len(pmids) < 100:
+                continue
+            # fetch
+            fetch_multiple_articles(pmids, out_dir, lang1, lang2)
+            return
+    if len(pmids) > 0:
+        fetch_multiple_articles(pmids, out_dir, lang1, lang2)
+
 
 if __name__ == '__main__':
-	retrieve_abstracts(sys.argv[1],sys.argv[2])
-
-
+    """
+    Steps to download data:
+    1. Clone the repo.
+    2. Extract trainWmt22.zip so that the files are in this folder or change the language extraction logic to match the folder structure.
+    3. Rename the extracted files to remove train22_ from them or change the language extraction logic to match the file names.
+    4. Run this file.
+    """
+    data_filenames = [
+        "eng_chi",
+        "eng_fre",
+        "eng_ger",
+        "eng_ita",
+        "eng_por",
+        "eng_rus",
+        "eng_spa"
+    ]
+    output_dir = "data/raw"
+    shutil.rmtree(output_dir, ignore_errors=True)
+    for data_filename in data_filenames:
+        output_dir_name = f"{output_dir}/{data_filename}"
+        path = Path(output_dir_name)
+        path.mkdir(parents=True, exist_ok=True)
+        retrieve_abstracts(f"{data_filename}.txt", output_dir_name)
