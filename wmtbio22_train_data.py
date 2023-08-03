@@ -83,7 +83,8 @@ def fetch_pubmed_articles(ids):
     return set_articles, set_langs
 
 
-def fetch_multiple_articles(pmids, out_dir, lang1, lang2):
+def fetch_multiple_articles(pmids, out_dir, lang1, lang2, suffix):
+    suffix = str(suffix)
     print(pmids)
     set_articles, set_langs = fetch_pubmed_articles(pmids)
     for index in range(0, len(set_articles)):
@@ -96,11 +97,12 @@ def fetch_multiple_articles(pmids, out_dir, lang1, lang2):
             lang = detect(item["abstracttext"])
             if lang != lang1 and lang != lang2:
                 continue
-            print(item["pmid"])
-            print(item["abstracttext"])
-            print(item["lang"])
-            with open(os.path.join(out_dir, item["pmid"] + "_" + item["lang"] + ".txt"), "w") as writer:
-                writer.write(item["abstracttext"] + "\n")
+            print(item["pmid"] + "_" + item["lang"])
+            # print(item["abstracttext"])
+            # print(item["lang"])
+            with open(os.path.join(out_dir, item["lang"] + "_" + suffix + ".txt"), "a") as writer:
+                abstracttext = item["abstracttext"].replace("\n", " ")
+                writer.write(abstracttext + "\n")
             writer.close()
 
 
@@ -125,6 +127,7 @@ def get_lang1_lang2(filename):
 
 def retrieve_abstracts(filename, out_dir):
     lang1, lang2 = get_lang1_lang2(filename)
+    pmids_total = 0
     pmids = []
     with open(os.path.join(filename), "r") as reader:
         lines = reader.readlines()
@@ -134,10 +137,12 @@ def retrieve_abstracts(filename, out_dir):
             if len(pmids) < 100:
                 continue
             # fetch
-            fetch_multiple_articles(pmids, out_dir, lang1, lang2)
-            return
+            pmids_total += len(pmids)
+            fetch_multiple_articles(pmids, out_dir, lang1, lang2, pmids_total // 100)
+            pmids = []
     if len(pmids) > 0:
-        fetch_multiple_articles(pmids, out_dir, lang1, lang2)
+        pmids_total += len(pmids)
+        fetch_multiple_articles(pmids, out_dir, lang1, lang2, (pmids_total // 100) + 1)
 
 
 if __name__ == '__main__':
@@ -149,18 +154,12 @@ if __name__ == '__main__':
     4. Run this file.
     """
     data_filenames = [
-        "eng_chi",
-        "eng_fre",
-        "eng_ger",
-        "eng_ita",
-        "eng_por",
-        "eng_rus",
-        "eng_spa"
+        "eng_fre"
     ]
     output_dir = "data/raw"
-    shutil.rmtree(output_dir, ignore_errors=True)
     for data_filename in data_filenames:
         output_dir_name = f"{output_dir}/{data_filename}"
+        shutil.rmtree(output_dir_name, ignore_errors=True)
         path = Path(output_dir_name)
         path.mkdir(parents=True, exist_ok=True)
         retrieve_abstracts(f"{data_filename}.txt", output_dir_name)
